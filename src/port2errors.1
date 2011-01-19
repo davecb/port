@@ -1,0 +1,49 @@
+﻿.\"	@(#) port.1 
+.\"
+.TH port2errors 1 "30 Jul 1906"
+.AT 3
+.SH NAME
+port \- add porting instructions to error-message lines
+.SH SYNOPSIS
+.B port2errors
+.B [-d database]
+errors-file
+.sp 0
+.SH DESCRIPTION
+.I port2errors
+adds porting advice to the error-message-format file as
+comments, for the convenience of the engineer.  For
+each interface encountered, the database contents for
+that interface are inserted as comments immediately
+following the first mention of the function in the file.
+
+.TP
+.B \-d
+database
+.br
+selects a database of portability problems to use.
+The default is the Linux database.
+
+.TP
+.B \-
+.br
+Reads from stdin.
+
+.SH FILES
+.sp 0
+Numerous database files, in /opt/port/databases.
+
+.SH "SEE ALSO"
+port(1), port2report(1)
+
+
+.SH BUGS
+
+.SH COMPATIBILITY
+
+.SH CHANGES
+
+.SH ACKNOWLEDGEMENTS
+
+.SH AUTHOR
+David Collier-Brown

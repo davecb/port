@@ -1,0 +1,134 @@
+#!/bin/sh
+#
+# port2report -- Create a report from an error-message-format
+#	file from port. Needs to use the same database as the
+#	run of port did.
+#
+#set -x
+DBPATH=/opt/port/databases
+ProgName=`basename $0`
+Database="linux"
+
+main() {
+
+	if [ $# -lt 1 ]; then
+		say "$ProgName error: you must supply an errors file"
+		say "Usage: $0 [-d database][-] file.errors"
+		exit 1
+	fi
+	while [ "$1" != "" ]; do
+		case "$1" in
+		-d) Database=$2
+			shift
+			;;
+		-*) say "Unrecognized option $1 ignored." 
+			;;
+		*) break ;;
+		esac
+		shift
+	done
+	name=$1
+
+	reportComments
+	port2report $name
+}
+
+#
+# port2report -- filter output into a report suitable
+#	for loading into open/star office.
+#	Used to call sort -u -k 4,4 -k 1,1 -k 3,3n |\
+port2report() {
+	name=$1
+	cat $name |\
+        egrep '^"' |\
+	awk '
+	BEGIN { 
+		interface = ""
+		file=""
+		n=1
+	}
+	/^#/ { next }
+	/^%/ { print $0 }
+	/Interface Name/ {
+		# We hit the table at the end, we can stop now.
+		exit
+	}
+		
+	/.*/ {
+		if (interface != $4) {
+			print ""
+			print n ") " $4
+			header($4)
+			print "Found in:"
+			print $1
+			print "      ",$3,$5 " " $6 " " $7 " " $8 " " $9
+
+			interface = $4
+			file=$1
+			n++
+		}
+		else if (file != $1) {
+			print $1
+			print "      ",$3,$5 " " $6 " " $7 " " $8 " " $9
+			file=$1
+		}
+		else {
+			print "      ",$3,$5 " " $6 " " $7 " " $8 " " $9
+		}
+	}
+	function header(name, line,active) {
+
+		active = 0
+		while (getline line < "'$DBPATH/$Database.ref'") {
+			if (line ~ "^NAME:[ ]*" name "[ ]*$") {
+				active = 1
+				print name
+				continue
+			}
+			else if (line ~ /END_EXAMPLE/) {
+				if (active == 1) {
+					# End of this function
+					print ""
+					break
+				}
+			}
+			else if (line ~ /WEIGHT/) {
+				gsub("WEIGHT:","Weight:", line);
+			}
+			else if (line ~ /TRANSFORM/) {
+				gsub("TRANSFORM:", "Transform: ", line)
+			}
+			else if (line ~ /BEGIN_COMMENT/ \
+				|| line ~ /END_COMMENT/  \
+				|| line ~ /BEGIN_EXAMPLE/) {
+				continue;
+			}
+
+			if (active) {
+				print line
+			}
+		}
+		close("'$DBPATH/$Database.ref'")
+		if (active == 0) {
+			print "ERROR: interface \"" name "\" not found in '$DBPATH/$Database.ref'"
+		}
+	}
+'
+}
+
+#
+# reportComments -- print comments from database at the
+#	beginning of the report.
+#
+reportComments() {
+
+	grep '^%' $DBPATH/$Database.ref |\
+	tr "%" "#"
+}
+
+
+say() {
+	echo "$@" 1>&2
+}
+
+main "$@"

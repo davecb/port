@@ -1,0 +1,117 @@
+﻿.\"	@(#) port.1 
+.\"
+.TH port 1 "30 Jul 1906"
+.AT 3
+.SH NAME
+port \- report porting issues in  compiler error-message format
+.SH SYNOPSIS
+.B port
+.B [-d database][-Iinclude][-Ddefine][-e|-f|-i|-n|-r|-s|-v]
+file or directory ...
+.sp 0
+.SH DESCRIPTION
+.I port
+is used to search source files for portability issues, and
+report them in the format used by the compilers, so that
+one can use an editor's "skip to next error" function with
+them.
+.PP 
+It is normally used to find function calls, looking for "<name> *("
+as these are the usual non-portable things.
+.PP
+If the function is present but doesn't meet the database's
+criteria for being an issue, the line will end with " NC",
+for "no change". This is done if the call is indirect through
+a class, struct or pointer, and if the issue involves
+errno but errno is not live in the context where the call is made.
+
+.TP
+.B \-d
+database
+.br
+selects a database of portability problems to use.
+The default is the Linux database.
+.PP
+.TP
+.BR \-Iinclude
+Passes an include directory to cpp.
+.TP
+.BR \-Ddefine
+Passes a define to cpp.
+.TP
+.B -i
+Tells port to report on indirect calls to a function, so
+that vfs->clone(), vfs.clone() or String::clone() will be 
+treated the same as clone.  Defaults to off, as numerous
+libraries and languages tend to re-use standard library
+function names for quite different functions than the ones
+we're concerned about. String::clone(), for example, is 
+a strdup  function in one c++ library.
+.TP
+.B \-e
+Tells port to search the database COMMENT and EXAMPLE fields
+for references to errno, rather than looking for an ERRNO:yes field.
+New databases have an ERRNO field, old ones don't.
+.TP
+.B \-l
+Language: looks at any use of the name, not just
+function calls. Used to allow looking for language features
+when porting from one dialect of a language to another.
+.TP
+.B \-n
+No CPP: turns off preprocessing so
+that non-c languages files, such a php, can be ported. 
+.TP
+.B \-r
+Reverse: use RWEIGHT and RTRANSFORM database fields
+to translate from Solaris to another operating 
+system, Typically used in doing a non-Solaris port
+by first porting to Solaris and then reverse-porting
+to the other OS.
+.TP
+.B \-s
+Silent: do not count any issue recognized as "NC".
+.TP
+.B \-v
+Verbose: prints cpp output and diagnoses on stderr as they are
+encountered. Predominantly for debugging.
+.SH FILES
+.sp 0
+Numerous database files, in /opt/port/databases.
+
+.SH "SEE ALSO"
+port2report(1), port2errors(), cpp(1)
+
+
+.SH BUGS
+Uses Gnu cpp, and so will fail if gcc -E can't be found. Use 
+\-n in this case.
+.PP
+Uses sort -k, so will fail of the sort program doesn't honor
+the -k (key) option.
+.PP
+Fortran (-n, -l) experimental modes mode only works on files, 
+not directories.
+
+.SH DIAGNOSTICS
+All error messages resemble the following:
+.nf
+.nj
+"./auth/ntlmssp/ntlmssp_server.c", line 43: accept NC
+"./lib/socket/socket_ipv4.c", line 214: accept NC
+.fi
+.ju
+.PP
+If you see "gcc: linker input file unused because linking not done",
+the language in use doesn't require CPP pre-processing. An example
+of this is php.
+
+
+.SH COMPATIBILITY
+
+.SH CHANGES
+
+.SH ACKNOWLEDGEMENTS
+
+.SH AUTHOR
+David Collier-Brown

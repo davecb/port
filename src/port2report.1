@@ -1,0 +1,87 @@
+﻿.\"	@(#) port.1 
+.\"
+.TH port2report 1 "30 Jul 1906"
+.AT 3
+.SH NAME
+port \-  create a report from an error-message file from port
+.SH SYNOPSIS
+.B port
+.B [-d database][-]
+file ...
+.sp 0
+.SH DESCRIPTION
+.I port2report
+reads a port output file and creates a text file for
+editing in, for example, Star Office, reporting on
+portabilities encountered.
+
+.PP
+A example is:
+
+.nf
+.nj
+1) cv_timedwait
+NAME:cv_timedwait
+WEIGHT:10
+BEGIN_COMMENT
+int cv_timedwait(kcondvar_t *cvp, kmutex_t *mp, long timeout) has become
+int cv_timedwait(kcondvar_t *cvp, kmutex_t *mp,clock_t timeout);
+END COMMENT
+#include <sys/ksynch.h>
+
+int cv_timedwait(kcondvar_t *cvp, kmutex_t *mp,clock_t timeout);
+END_EXAMPLE
+
+Found in:
+"64bitDriver_test.c",
+       5:
+.fi
+.ju
+
+.PP
+In the report, each file is listed, followed by a line with
+the line-number of each line it was found in, followed
+by a colon, for the engineer to add comments to.
+
+.PP
+Typically this is used to report the changes on a line-by-line
+basis, if the customer needs that level of detail.
+
+.PP
+If the function is present but doesn't meet the database's
+criteria for being an issue, this line will already be
+filled in with "NC" for "no change". 
+
+.SH OPTIONS
+.TP
+.B \-d
+database
+.br
+selects a database of portability problems to use.
+The default is the Linux database.
+
+.TP
+.B \-
+.br
+causes stdin to be read for a list of errors.
+
+.SH FILES
+.sp 0
+Numerous database files, in /opt/port/databases.
+
+.SH "SEE ALSO"
+port(1), port2errors(1)
+
+
+.SH BUGS
+
+.SH DIAGNOSTICS
+
+.SH COMPATIBILITY
+
+.SH CHANGES
+
+.SH ACKNOWLEDGEMENTS
+
+.SH AUTHOR
+David Collier-Brown

@@ -1,0 +1,73 @@
+﻿.\"	@(#) port.4 
+.\"
+.TH port 4 "11 Aug 1906"
+.AT 3
+.SH NAME
+port databases
+.SH DESCRIPTION
+The 
+.I port
+program uses a textual database as follows:
+.PP
+Lines in the database beginning with '%' will be copied from
+the database to the output unchanged. This is to allow
+inserting notes on prerequisites.
+In addition, ERRNO, TRANSFORM an OPTIONS field tags are
+added to the ones supported by jscore.
+
+The fields are as follows:
+.nf
+.nj
+#
+# strncpy --report on strncpy and optionally strncat and sprintf
+#
+NAME:strncpy
+WEIGHT: 5
+TRANSFORM: sed -n -e '/strncpy/s//strlcpy/gp'
+BEGIN_COMMENT
+Strncpy will happily create a non-null-terminated string if
+the source is the same size (!) or larger than the target.
+Use strlcpy(target, source, sizeof(target))
+END_COMMENT
+BEGIN_EXAMPLE
+END_EXAMPLE
+.fi
+.ju
+.SH NAME:
+The name field contains an interface or variable name.
+.SH WEIGHT:
+.SH REWIGHT:
+The weight field contains a relative difficulty indicator,
+where 1 is trivial, 5 is easy, 25 requires thought and
+100 requires writing and testing a replacement function.
+RWEIGHT is reverse weight (see RTRANSFORM, below).
+.SH TRANSFORM:
+The transform files is a command-line command that is used
+to transform the function and its arguments into a
+new form, which will be appended to the error-message line.
+It should produce output if and only if a change is required
+thus the -n and /p of the sed example above.
+This was first used in the 64bitDriver.ref database
+.SH RTRANSFORM:
+Reverse transform, used when porting to a non-Solaris system,
+typically by porting “forwards” to Solaris first and then
+“reverse” porting elsewhere. 
+.SH KEYWORD:
+This indicates that name is not a function-name, but can
+be a keyword in the language or even a variable-name.
+The issue will be reported even if the name is not that
+of a function-call. This was first used in the C++update
+database.
+.SH ERRNO:
+This indicates the interface is
+.I only 
+an issue if errno
+is in scope and is used. Many issues involve errno but
+are not conditional on errno. This is most often seen in
+Linux or GNU-related databases.
+.SH BEGIN_COMMENT
+This marks the beginning of the descriptive text, which ends
+in END_COMMENT
+.SH BEGIN_EXAMPLE
+This marks the beginning of example code, which ends with END_EXAMPLE
+

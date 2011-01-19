@@ -1,0 +1,934 @@
+# Collection Copyright (C) 2007, Sun Microsystems
+# Copyright (C) 2006-7 by Data Center Works, 
+# This collection of information about software is
+# licenced under Sun's CDDL, as a collection. Individual
+# comments about interfaces are the the property of their 
+# various authors. 
+#
+
+% Prerequisite checks:
+% Make the code 64-bit clean with lint -errchk=longptr64
+% After running port, -errchk=longptr64 will now report only
+% the conflicts due to the changes you just made.
+% Use uintptr_t as an integral type of pointer rather than 
+% using a fundamental type like unsigned long.
+% Change all code that assumes pointer == long or int
+% You can now use any of memcpy, memset, memmove, memcmp, strncat, 
+% strlcat, strlcpy  or strspn in drivers.
+%
+% Reference documnts:
+% http://developers.sun.com/solaris/articles/64_bit_driver.html
+% http://developers.sun.com/solaris/articles/64_bit_driver_example.txt
+% Appx A to Writing Device Drivers, http://docs.sun.com/app/docs/doc/816-4854
+
+NAME:ddi_getb
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_getb/ddi_get8/gp'
+BEGIN_COMMENT
+Change ddi_getb() to ddi_get8()
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+uint8_t ddi_get8(ddi_acc_handle_t handle, uint8_t *dev_addr);
+
+END_EXAMPLE
+
+NAME:ddi_getw
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_getw/ddi_get16/gp'
+BEGIN_COMMENT
+Change ddi_getw() to ddi_get16()
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+uint16_t ddi_get16(ddi_acc_handle_t handle, uint16_t *dev_addr);
+
+END_EXAMPLE
+
+NAME:ddi_getl
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_getl/ddi_get32/gp'
+BEGIN_COMMENT
+Change ddi_getl() to ddi_get32() UNLESS you are lengthening
+the variable to 64 bit: in that case use ddi_get64.
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+uint32_t ddi_get32(ddi_acc_handle_t handle, uint32_t *dev_addr);
+END_EXAMPLE
+
+NAME:ddi_getll
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_getll/ddi_get64/gp'
+BEGIN_COMMENT
+Change ddi_getll() to ddi_get64()
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+uint64_t ddi_get64(ddi_acc_handle_t handle, uint64_t *dev_addr);
+
+END_EXAMPLE
+
+NAME:ddi_putb
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_putb/ddi_put8/gp'
+BEGIN_COMMENT
+Change ddi_putb() to ddi_put8()
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_put8(ddi_acc_handle_t handle, uint8_t *dev_addr, uint8_t value);
+
+END_EXAMPLE
+
+NAME:ddi_putw
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_putw/ddi_put16/gp'
+BEGIN_COMMENT
+Change ddi_putw() to ddi_put16()
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_put16(ddi_acc_handle_t handle, uint16_t *dev_addr, uint16_t value);
+END_EXAMPLE
+
+NAME:ddi_putl
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_putl/ddi_put32/gp'
+BEGIN_COMMENT
+Change ddi_putl() to ddi_put32() UNLESS you are lengthening
+the variable to 64 bit: in that case use ddi_put64.
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_put32(ddi_acc_handle_t handle, uint32_t *dev_addr, uint32_t value);
+END_EXAMPLE
+
+NAME:ddi_putll
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_putll/ddi_put64/gp'
+BEGIN_COMMENT
+Change ddi_putll() to ddi_put64()
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_put64(ddi_acc_handle_t handle, uint64_t *dev_addr, uint64_t value);
+END_EXAMPLE
+
+NAME:ioctl
+WEIGHT:25
+BEGIN_COMMENT
+Change the entry point for ioctl calls to check pointer lengths
+using ddi_model_convert_from(), which returns DDI_MODEL_RETURN_ILP32
+for 32-bit drivers and DDI_MODEL_NONE for 64-bit, optionally
+under control of #ifdef _MULTI_DATAMODEL
+
+The following data structures used by ioctl must be converted
+---
+ioctl Command   Affected Data Structure		Reference
+DKIOCGAPART	struct dk_map			dkio
+DKIOCSAPART	dk_allmap
+DKIOGVTOC	structpartition
+DKIOSVTOC	struct vtoc
+	
+FBIOPUTCMAP	struct fbcmap			fbio
+FBIOGETCMAP
+
+FBIOPUTCMAPI	struct fbcmap_i
+FBIOGETCMAPI
+
+FBIOSCURSOR	struct fbcursor
+FBIOSCURSOR
+
+CDROMREADMODE1	struct cdrom_read		cdio
+CDROMREADMODE2
+
+CDROMCDDA	struct cdrom_cdda
+CDROMCDXA	struct cdrom_cdxa
+CDROMSUBCODE	struct cdrom_subcode
+
+FDIOCMD		struct fd_cmd			fdio
+FDRAW		struct fd_raw
+	
+MTIOCTOP	struct mtop			mtio
+MTIOCGET	struct mtget
+MTIOCGETDRIVETYPE struct mtdrivetype_request
+	
+USCSICMD	struct uscsi_cm			scsi
+
+The nblocks property, the number of blocks each device contains, is defined 
+as a signed 32-bit integer. The nblocks property therefore limits the 
+maximum device size to 1 Tbyte. A new property, Nblocks, is defined as an 
+unsigned 64-bit integer to remove this limitation. 
+END_COMMENT
+BEGIN_EXAMPLE
+struct passargs32 {
+             int len;
+             caddr32_t addr;
+};
+
+struct passargs {
+        int len;
+        caddr_t addr;
+};
+xxioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, 
+							int *rvalp) {
+        struct passargs pa;
+
+#ifdef  _MULTI_DATAMODEL
+        switch (ddi_model_convert_from(mode & FMODELS)) {
+            case DDI_MODEL_ILP32: {
+                struct passargs32 pa32;
+
+                ddi_copyin(arg, &pa32, sizeof (struct passargs32),mode);
+                pa.len = pa32.len;
+                pa.address = pa32.address;
+                break;
+            }
+            case DDI_MODEL_NONE:
+                ddi_copyin(arg, &pa, sizeof (struct passargs), mode);
+                break;
+        }
+#else /* Not _MULTI_DATAMODEL */
+        ddi_copyin(arg, &pa, sizeof (struct passargs), mode);
+#endif  /* _MULTI_DATAMODEL */
+
+        do_ioctl(&pa);
+        ....
+}
+END_EXAMPLE
+
+NAME:mmap
+WEIGHT:25
+BEGIN_COMMENT
+Change the entry point for mmap calls to check pointer lengths
+using ddi_model_convert_from(), which returns DDI_MODEL_RETURN_ILP32
+for 32-bit drivers and DDI_MODEL_NONE for 64-bit, optionally
+under control of #ifdef _MULTI_DATAMODEL. See the example below,
+showing how it is done in ioctl.
+END_COMMENT
+BEGIN_EXAMPLE
+struct passargs32 {
+        int len;
+        caddr32_t addr;
+};
+
+struct passargs {
+        int len;
+        caddr_t addr;
+};
+xxioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, 
+							int *rvalp) {
+        struct passargs pa;
+
+#ifdef  _MULTI_DATAMODEL
+        switch (ddi_model_convert_from(mode & FMODELS)) {
+            case DDI_MODEL_ILP32: {
+                struct passargs32 pa32;
+
+                ddi_copyin(arg, &pa32, sizeof (struct passargs32),mode);
+                pa.len = pa32.len;
+                pa.address = pa32.address;
+                break;
+            }
+            case DDI_MODEL_NONE:
+                ddi_copyin(arg, &pa, sizeof (struct passargs), mode);
+                break;
+        }
+#else /* Not _MULTI_DATAMODEL */
+        ddi_copyin(arg, &pa, sizeof (struct passargs), mode);
+#endif  /* _MULTI_DATAMODEL */
+
+        do_ioctl(&pa);
+        ....
+}
+END_EXAMPLE
+
+NAME:devmap
+WEIGHT:25
+BEGIN_COMMENT
+Change the entry point for mmap calls to check pointer lengths
+using ddi_model_convert_from(), which returns DDI_MODEL_RETURN_ILP32
+for 32-bit drivers and DDI_MODEL_NONE for 64-bit, optionally
+under control of #ifdef _MULTI_DATAMODEL. See the example below,
+showing how it is done in ioctl.
+END_COMMENT
+BEGIN_EXAMPLE
+struct passargs32 {
+        int len;
+        caddr32_t addr;
+};
+
+struct passargs {
+        int len;
+        caddr_t addr;
+};
+xxioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, 
+							int *rvalp) {
+        struct passargs pa;
+
+#ifdef  _MULTI_DATAMODEL
+        switch (ddi_model_convert_from(mode & FMODELS)) {
+            case DDI_MODEL_ILP32: {
+                struct passargs32 pa32;
+
+                ddi_copyin(arg, &pa32, sizeof (struct passargs32),mode);
+                pa.len = pa32.len;
+                pa.address = pa32.address;
+                break;
+            }
+            case DDI_MODEL_NONE:
+                ddi_copyin(arg, &pa, sizeof (struct passargs), mode);
+                break;
+        }
+#else /* Not _MULTI_DATAMODEL */
+        ddi_copyin(arg, &pa, sizeof (struct passargs), mode);
+#endif  /* _MULTI_DATAMODEL */
+
+        do_ioctl(&pa);
+        ....
+}
+END_EXAMPLE
+
+
+
+NAME:ddi_putll
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_putll/ddi_put64/gp'
+BEGIN_COMMENT
+Change ddi_putll() to ddi_put64()
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_put64(ddi_acc_handle_t handle, uint64_t *dev_addr, uint64_t value);
+END_EXAMPLE
+
+NAME:ddi_rep_getb
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_rep_getb/ddi_rep_get8/gp'
+BEGIN_COMMENT
+Change ddi_rep_getb() to ddi_rep_get8()
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_rep_get8(ddi_acc_handle_t handle, uint8_t *host_addr, uint8_t *dev_addr, size_t repcount, uint_t flags);
+END_EXAMPLE
+
+NAME:ddi_rep_getw
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_rep_getw/ddi_rep_get16/gp'
+BEGIN_COMMENT
+Change ddi_rep_getw() to ddi_rep_get16()
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_rep_get16(ddi_acc_handle_t handle, uint16_t *host_addr, uint16_t *dev_addr, size_t repcount, uint_t flags);
+END_EXAMPLE
+
+NAME:ddi_rep_getl
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_rep_getw/ddi_rep_get32/gp'
+BEGIN_COMMENT
+Change ddi_rep_getl() to ddi_rep_get32()
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_rep_get32(ddi_acc_handle_t handle, uint32_t *host_addr, uint32_t *dev_addr, size_t repcount, uint_t flags);
+END_EXAMPLE
+
+NAME:ddi_rep_getll
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_rep_getll/ddi_rep_get64/gp'
+BEGIN_COMMENT
+Change ddi_rep_getll() to ddi_rep_get64()
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_rep_get64(ddi_acc_handle_t handle, uint64_t *host_addr, uint64_t *dev_addr, size_t repcount, uint_t flags);
+END_EXAMPLE
+
+NAME:ddi_rep_putb
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_rep_putb/ddi_rep_put8/gp'
+BEGIN_COMMENT
+Change ddi_rep_putb() to ddi_rep_put8()
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_rep_put8(ddi_acc_handle_t handle, uint8_t *host_addr, uint8_t *dev_addr, size_t repcount, uint_t flags);
+END_EXAMPLE
+
+NAME:ddi_rep_putw
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_rep_putw/ddi_rep_put16/gp'
+BEGIN_COMMENT
+Change ddi_rep_putw() to ddi_rep_put16() 
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_rep_put16(ddi_acc_handle_t handle, uint16_t *host_addr, uint16_t *dev_addr, size_t repcount, uint_t flags);
+END_EXAMPLE
+
+
+NAME:ddi_rep_putl
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_rep_putl/ddi_rep_put32/gp'
+BEGIN_COMMENT
+Change ddi_rep_putl() to ddi_rep_put32()
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_rep_put32(ddi_acc_handle_t handle, uint32_t *host_addr, uint32_t *dev_addr, size_t repcount, uint_t flags);
+END_EXAMPLE
+
+NAME:ddi_rep_putll
+WEIGHT:5
+TRANSFORM: sed -n -e 's/ddi_rep_putll/ddi_rep_put64/gp'
+BEGIN_COMMENT
+Change ddi_rep_putll() to ddi_rep_put64()
+END_COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr, uint64_t *dev_addr, size_t repcount, uint_t flags); 
+END_EXAMPLE
+
+NAME:pci_config_getb
+WEIGHT:5
+TRANSFORM: sed -n -e 's/pci_config_getb/pci_config_get8/gp'
+BEGIN_COMMENT
+Change pci_config_getb() to pci_config_get8()
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+uint8_t pci_config_get8(ddi_acc_handle_t handle, off_t offset);
+END_EXAMPLE
+
+NAME:pci_config_getw
+WEIGHT:5
+TRANSFORM: sed -n -e 's/pci_config_getw/pci_config_get16/gp'
+BEGIN_COMMENT
+Change pci_config_getw() to pci_config_get16() 
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+uint16_t pci_config_get16(ddi_acc_handle_t handle, off_t offset);
+END_EXAMPLE
+
+NAME:pci_config_getl
+WEIGHT:5
+TRANSFORM: sed -n -e 's/pci_config_getl/pci_config_get32/gp'
+BEGIN_COMMENT
+Change pci_config_getl() to pci_config_get32()
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+uint32_t pci_config_get32(ddi_acc_handle_t handle, off_t offset);
+END_EXAMPLE
+
+NAME:pci_config_getll
+WEIGHT:5
+TRANSFORM: sed -n -e 's/pci_config_getll/pci_config_get64/gp'
+BEGIN_COMMENT
+Change pci_config_getll() to pci_config_get64()
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+uint64_t pci_config_get64(ddi_acc_handle_t handle, off_t offset);
+END_EXAMPLE
+
+NAME:pci_config_putb
+WEIGHT:5
+TRANSFORM: sed -n -e 's/pci_config_putb/pci_config_put8/gp'
+BEGIN_COMMENT
+Change pci_config_putb() to pci_config_put8() 
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void pci_config_put8(ddi_acc_handle_t handle, off_t  offset, uint8_t value);
+END_EXAMPLE
+
+NAME:pci_config_putw
+WEIGHT:5
+TRANSFORM: sed -n -e 's/pci_config_putw/pci_config_put16/gp'
+BEGIN_COMMENT
+Change pci_config_putw() to pci_config_put16()
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void pci_config_put16(ddi_acc_handle_t handle, off_t offset, uint16_t value);
+END_EXAMPLE
+
+NAME:pci_config_putl
+WEIGHT:5
+TRANSFORM: sed -n -e 's/pci_config_putl/pci_config_put32/gp'
+BEGIN_COMMENT
+Change pci_config_putl() to pci_config_put32() 
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void pci_config_put32(ddi_acc_handle_t handle, off_t offset, uint32_t value);
+END_EXAMPLE
+
+NAME:pci_config_putll
+WEIGHT:5
+TRANSFORM: sed -n -e 's/pci_config_putll/pci_config_put64/gp'
+BEGIN_COMMENT
+Change pci_config_putll() to pci_config_put64()
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void pci_config_put64(ddi_acc_handle_t handle, off_t offset, uint64_t value);
+END_EXAMPLE
+
+NAME:inb
+WEIGHT:10
+BEGIN_COMMENT
+unsigned char inb(int port) has become  uint8_t inb(int port)
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+unsigned char inb(int port);
+END_EXAMPLE
+
+NAME:inw
+WEIGHT:10
+BEGIN_COMMENT
+unsigned short inw(int port) has become uint16_t inw(int port)
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+unsigned char inw(int port);
+END_EXAMPLE
+
+NAME:inl
+WEIGHT:10
+BEGIN_COMMENT
+unsigned long inl(int port) has become uint32_t inl(int port) 
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+unsigned char inl(int port);
+END_EXAMPLE
+
+NAME:repinsb
+WEIGHT:10
+BEGIN_COMMENT
+void repinsb(int port, unsigned char *addr, int count) has become
+void repinsb(int port, uint8_t *addr, int count)
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void repinsb(int port, unsigned char *addr, int count);
+END_EXAMPLE
+
+NAME:repinsw
+WEIGHT:10
+BEGIN_COMMENT
+void repinsw(int port, unsigned short *addr, int count) has become
+void repinsw(int port, uint16_t *addr, int count)
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void repinsw(int port, uint16_t *addr, int count);
+END_EXAMPLE
+
+NAME:repinsd
+WEIGHT:10
+BEGIN_COMMENT
+void repinsd(int port, unsigned long *addr, int count) has become 
+void repinsd(int port, uint32_t *addr, int count)
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void repinsd(int port, uint32_t *addr, int count)
+END_EXAMPLE
+
+NAME:outb
+WEIGHT:10
+BEGIN_COMMENT
+void outb(int port, unsigned char value) has become 
+void outb(int port, uint8_t value)
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void outb(int port, uint8_t value);
+END_EXAMPLE
+
+
+NAME:outw
+WEIGHT:10
+BEGIN_COMMENT
+void outw(int port, unsigned short value) has become 
+void outw(int port, uint16_t value)
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void outw(int port, uint16_t value);
+END_EXAMPLE
+
+NAME:outl
+WEIGHT:10
+BEGIN_COMMENT
+void outl(int port, unsigned long value) has become 
+void outl(int port, uint32_t value); 
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void outl(int port, uint32_t value);
+END_EXAMPLE
+
+NAME:repoutsb
+WEIGHT:10
+BEGIN_COMMENT
+void repoutsb(int port, unsigned char *addr, int count) has become 
+void repoutsb(int port, uint8_t *addr, int count);
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void repoutsb(int port, uint8_t *addr, int count);
+END_EXAMPLE
+
+NAME:repoutsw
+WEIGHT:10
+BEGIN_COMMENT
+void repoutsw(int port, unsigned short *addr, int count) has become 
+void repoutsw(int port, uint16_t *addr, int count); 
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void repoutsw(int port, uint16_t *addr, int count);
+END_EXAMPLE
+
+
+NAME:repoutsd
+WEIGHT:10
+BEGIN_COMMENT
+void repoutsd(int port, unsigned long *addr, int count) has become
+void repoutsd(int port, uint32_t *addr, int count) 
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void repoutsd(int port, uint32_t *addr, int count)
+END_EXAMPLE
+
+NAME:ddi_set_driver_private
+WEIGHT:10
+BEGIN_COMMENT
+void ddi_set_driver_private(dev_info_t *devi, caddr_t data) has become 
+void ddi_set_driver_private(dev_info_t *devi, void *data); 
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_set_driver_private(dev_info_t *dip, caddr_t data);
+END_EXAMPLE
+
+NAME:ddi_get_driver_private
+WEIGHT:10
+BEGIN_COMMENT
+void *ddi_get_driver_private(dev_info_t *devi) has become
+caddr_t ddi_get_driver_private(dev_info_t *devi);
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+caddr_t ddi_get_driver_private(dev_info_t *devi);
+END_EXAMPLE
+
+NAME:getrbuf
+WEIGHT:10
+BEGIN_COMMENT
+struct buf *getrbuf(long sleepflag) hs become
+struct buf *getrbuf(int sleepflag)
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/buf.h>
+#include <sys/kmem.h>
+#include <sys/ddi.h>
+
+struct buf *getrbuf(int sleepflag);
+END_EXAMPLE
+
+NAME:delay
+WEIGHT:10
+BEGIN_COMMENT
+void delay(long ticks) has become void delay(clock_t ticks);
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+
+void delay(clock_t ticks);
+END_EXAMPLE
+
+NAME:timeout
+WEIGHT:10
+BEGIN_COMMENT
+timeout_id_t timeout(void (*func)(caddr_t), caddr_t arg,long ticks) has become 
+timeout_id_t timeout(void (*func)(caddr_t), caddr_t arg, clock_t ticks);
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/types.h>
+#include <sys/conf.h>
+
+timeout_id_t timeout(void (*func)(caddr_t), caddr_t arg, clock_t ticks);
+END_EXAMPLE
+
+NAME:rmallocmap
+WEIGHT:10
+BEGIN_COMMENT
+struct map *rmallocmap(ulong_t mapsize) has become 
+struct map *rmallocmap(size_t mapsize);
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+struct map *rmallocmap(size_t mapsize);
+END_EXAMPLE
+
+NAME:rmallocmap_wait
+WEIGHT:10
+BEGIN_COMMENT
+struct map *rmallocmap_wait(ulong_t mapsize) has become 
+struct map *rmallocmap_wait(size_t mapsize);
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+struct map *rmallocmap_wait(size_t mapsize);
+END_EXAMPLE
+
+
+NAME:scsi_alloc_consistent_buf
+WEIGHT:10
+BEGIN_COMMENT
+struct buf *scsi_alloc_consistent_buf( struct scsi_address *ap, struct buf *bp,
+  int datalen, ulong_t bflags, int (*callback )(caddr_t), caddr_t arg) 
+has become 
+ struct buf *scsi_alloc_consistent_buf(structs scsi_address *ap, struct buf 
+ *bp, size_t datalen, uint_t bflags, int (*callback )(caddr_t), caddr_t arg);
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/scsi/scsi.h>
+
+struct buf *scsi_alloc_consistent_buf(structs scsi_address *ap, struct buf
+ *bp, size_t datalen, uint_t bflags, int (*callback )(caddr_t), caddr_t arg);
+END_EXAMPLE
+
+
+NAME:uiomove
+WEIGHT:10
+BEGIN_COMMENT
+int uiomove(caddr_t address, long nbytes, enum uio_rw rwflag, uio_t *uio_p) 
+has become 
+int uiomove(caddr_t address, size_t nbytes, enum uio_rw rwflag, uio_t *uio_p);
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/types.h>
+#include <sys/uio.h>
+
+int uiomove(caddr_t address, size_t nbytes, enum uio_rw rwflag, uio_t *uio_p);
+END_EXAMPLE
+
+NAME:cv_timedwait
+WEIGHT:10
+BEGIN_COMMENT
+int cv_timedwait(kcondvar_t *cvp, kmutex_t *mp, long timeout) has become 
+int cv_timedwait(kcondvar_t *cvp, kmutex_t *mp,clock_t timeout);
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ksynch.h>
+
+int cv_timedwait(kcondvar_t *cvp, kmutex_t *mp,clock_t timeout);
+END_EXAMPLE
+
+
+NAME:cv_timedwait_sig
+WEIGHT:10
+BEGIN_COMMENT
+int cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp, long timeout) has become 
+int cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp,clock_t timeout);
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ksynch.h>
+
+int cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp,clock_t timeout);
+END_EXAMPLE
+
+
+NAME:ddi_device_copy
+WEIGHT:10
+BEGIN_COMMENT
+int ddi_device_copy(ddi_acc_handle_t src_handle, caddr_t src_addr, 
+  long src_advcnt,ddi_acc_handle_t dest_handle, caddr_t dest_addr, 
+  long dest_advcnt, size_t bytecount, ulong_t dev_datasz) has become 
+int ddi_device_copy(ddi_acc_handle_t src_handle, caddr_t src_addr, 
+  ssize_t src_advcnt, ddi_acc_handle_t dest_handle, caddr_t dest_addr, 
+  ssize_t dest_advcnt, size_t bytecount, uint_t dev_datasz);
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+int ddi_device_copy(ddi_acc_handle_t src_handle, caddr_t src_addr,
+  ssize_t src_advcnt, ddi_acc_handle_t dest_handle, caddr_t dest_addr,
+  ssize_t dest_advcnt, size_t bytecount, uint_t dev_datasz);
+END_EXAMPLE
+
+
+NAME:ddi_device_zero
+WEIGHT:10
+BEGIN_COMMENT
+int ddi_device_zero(ddi_acc_handle_t handle, caddr_t dev_addr, 
+  size_t bytecount, long dev_advcnt, ulong_t dev_datasz) has become
+int ddi_device_zero(ddi_acc_handle_t handle, caddr_t dev_addr, 
+  size_t bytecount, ssize_t dev_advcnt,uint_t dev_datasz):
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+int ddi_device_zero(ddi_acc_handle_t handle, caddr_t dev_addr,
+  size_t bytecount, ssize_t dev_advcnt,uint_t dev_datasz):
+END_EXAMPLE
+
+
+NAME:ddi_dma_mem_alloc
+WEIGHT:10
+BEGIN_COMMENT
+int ddi_dma_mem_alloc(ddi_dma_handle_t handle, uint_t length, 
+  ddi_device_acc_attr_t *accattrp, ulong_t flags, int (*waitfp)(caddr_t), 
+  caddr_t arg, caddr_t *kaddrp, uint_t *real_length, ddi_acc_handle_t *handlep) 
+has become 
+int ddi_dma_mem_alloc(ddi_dma_handle_t handle, size_t length, 
+  ddi_device_acc_attr_t *accattrp, uint_t flags, int (*waitfp)(caddr_t), 
+  caddr_t arg, caddr_t *kaddrp, size_t *real_length, ddi_acc_handle_t *handlep);
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+int ddi_dma_mem_alloc(ddi_dma_handle_t handle, size_t length,
+  ddi_device_acc_attr_t *accattrp, uint_t flags, int (*waitfp)(caddr_t),
+  caddr_t arg, caddr_t *kaddrp, size_t *real_length, ddi_acc_handle_t *handlep);END_EXAMPLE
+
+
+NAME:drv_getparm
+WEIGHT:10
+BEGIN_COMMENT
+In the 64-bit kernel, drv_getparm() to can be used to fetch both 
+32-bit and 64-bit quantities. However, the interface does not define 
+the data type of the value pointed to by value_p. This can lead 
+to programming errors. You should not use drv_getparm(). 
+Use the following new routines instead:
+
+clock_t ddi_get_lbolt(void)
+time_t ddi_get_time(void)
+cred_t *ddi_get_cred(void)
+pid_t ddi_get_pid(void)
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/types.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+clock_t ddi_get_lbolt(void);
+time_t ddi_get_time(void);
+pid_t ddi_get_pid(void);
+END_EXAMPLE
+
+NAME:ddi_dma_segtocookie
+WEIGHT:20
+BEGIN_COMMENT
+This function is replaced by ddi_dma_nextcookie
+int ddi_dma_segtocookie(ddi_dma_seg_t seg, off_t *offp,
+     off_t *lenp, ddi_dma_cookie_t *cookiep);
+becomes
+void ddi_dma_nextcookie(ddi_dma_handle_t handle, ddi_dma_cookie_t *cookiep);
+END COMMENT
+BEGIN_EXAMPLE
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+
+void ddi_dma_nextcookie(ddi_dma_handle_t handle, ddi_dma_cookie_t *cookiep);
+END_EXAMPLE
+

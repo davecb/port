@@ -1,0 +1,123 @@
+#!/bin/sh
+#
+# port2errors -- remove error lines marked "NC", add description
+#	after first error of a given type.  Needs to use the same 
+#	database as the run of port did.
+#
+#set -x
+DBPATH=/opt/port/databases
+ProgName=`basename $0`
+Database="linux"
+
+main() {
+
+	if [ $# -lt 1 ]; then
+		say "$ProgName error: you must supply an errors file"
+		say "Usage: $0 [-d database] file.errors"
+		exit 1
+	fi
+	while [ "$1" != "" ]; do
+		case "$1" in
+		-d) Database=$2
+			shift
+			;;
+		-) # Use stdin
+			;;
+		-*) say "Unrecognized option $1 ignored." 
+			;;
+		*) break ;;
+		esac
+		shift
+	done
+	name=$1
+
+	reportComments
+	cat $name |\
+	egrep '^"' |\
+	# Don't bother with NC entries
+	egrep -v ' NC' |\
+	port2errors
+}
+
+#
+# port2errors -- insert port database description after
+#	first error of a given type.
+port2errors() {
+	name=$1
+	cat $name # |\
+	exit
+	awk '
+	BEGIN { 
+		interface = ""
+	}
+	/^#/ { next }
+	/^%/ { print "# ", $0 }
+	/Interface Name/ {
+		# We hit the table at the end, we can stop now.
+		exit
+	}
+		
+	/.*/ {
+		print ">> ", $0
+		if (interface != $4) {
+			print $0
+			description($4)
+			interface = $4
+		}
+		else {
+			print $0
+		}
+	}
+	function description(name, line,active) {
+		print ">>  found " name, line
+		active = 0
+		while (getline line < "'$DBPATH/$Database.ref'") {
+			if (line ~ "^NAME:[ ]*" name "[ ]*$") {
+				active = 1
+				print "# " name
+				continue
+			}
+			else if (line ~ /END_EXAMPLE/) {
+				if (active == 1) {
+					# End of this function
+					print "#"
+					print ""
+					break
+				}
+			}
+			else if (line ~ /WEIGHT/ \
+				|| line ~ /TRANSFORM/ \
+				|| line ~ /BEGIN_COMMENT/ \
+				|| line ~ /END_COMMENT/  \
+				|| line ~ /BEGIN_EXAMPLE/) {
+				continue;
+			}
+
+			if (active) {
+				print "# " line
+			}
+		}
+		close("'$DBPATH/$Database.ref'")
+		if (active == 0) {
+			print "ERROR: interface \"" name "\" not found in '$DBPATH/$Database.ref'"
+		}
+	}
+'
+}
+
+#
+# reportComments -- print comments from database at the
+#       beginning of the report.
+#
+reportComments() {
+
+        grep '^%' $DBPATH/$Database.ref |\
+        tr "%" "#"
+}
+
+
+say() {
+	echo "$@" 1>&2
+}
+
+main "$@"
